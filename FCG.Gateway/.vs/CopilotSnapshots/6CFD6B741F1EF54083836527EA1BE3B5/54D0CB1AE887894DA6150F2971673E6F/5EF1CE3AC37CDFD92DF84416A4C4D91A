@@ -1,0 +1,196 @@
+﻿version: "3.9"
+
+services:
+  gateway:
+    build: ./gateway
+    container_name: fcg-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - users-api
+      - games-api
+      - payments-api
+      - jaeger
+
+  users-api:
+    build: ../fcg-users-service
+    container_name: fcg-users-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=users-db;Database=usersdb;User Id=sa;Password=fiap@123;TrustServerCertificate=True
+      - Jwt__Issuer=fcg
+      - Jwt__Audience=fcg
+      - Jwt__Key=63034f05-afd0-4f63-bdfa-a48ee5e1f976
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__User=guest
+      - RabbitMQ__Password=guest
+      - RabbitMQ__Exchange=fcg.events
+      - OpenTelemetry__OtlpEndpoint=http://jaeger:4317
+    depends_on:
+      users-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    ports: ["5001:8080"]
+
+  games-api:
+    build: ../fcg-games-service
+    container_name: fcg-games-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=games-db;Database=gamesdb;User Id=sa;Password=fiap@123;TrustServerCertificate=True
+      - Jwt__Issuer=fcg
+      - Jwt__Audience=fcg
+      - Jwt__Key=63034f05-afd0-4f63-bdfa-a48ee5e1f976
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__User=guest
+      - RabbitMQ__Password=guest
+      - RabbitMQ__Exchange=fcg.events
+      - Elasticsearch__Url=http://elasticsearch:9200
+      - Elasticsearch__Index=fcg-games
+      - OpenTelemetry__OtlpEndpoint=http://jaeger:4317
+    depends_on:
+      games-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    ports: ["5002:8080"]
+
+  payments-api:
+    build: ../fcg-payments-service
+    container_name: fcg-payments-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=payments-db;Database=paymentsdb;User Id=sa;Password=fiap@123;TrustServerCertificate=True
+      - Jwt__Issuer=fcg
+      - Jwt__Audience=fcg
+      - Jwt__Key=63034f05-afd0-4f63-bdfa-a48ee5e1f976
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__User=guest
+      - RabbitMQ__Password=guest
+      - RabbitMQ__Exchange=fcg.events
+      - OpenTelemetry__OtlpEndpoint=http://jaeger:4317
+    depends_on:
+      payments-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    ports: ["5003:8080"]
+
+  users-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: users-db
+    environment:
+      - SA_PASSWORD=fiap@123
+      - ACCEPT_EULA=Y
+    ports: ["14331:1433"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P fiap@123 -Q 'SELECT 1' -C || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  games-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: games-db
+    environment:
+      - SA_PASSWORD=fiap@123
+      - ACCEPT_EULA=Y
+    ports: ["14332:1433"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P fiap@123 -Q 'SELECT 1' -C || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  payments-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: payments-db
+    environment:
+      - SA_PASSWORD=fiap@123
+      - ACCEPT_EULA=Y
+    ports: ["14333:1433"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P fiap@123 -Q 'SELECT 1' -C || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P fiap@123 -Q 'SELECT 1' -C || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports: ["5672:5672", "15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.3
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports: ["9200:9200"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+
+networks:
+  default:
+    name: fcg-net

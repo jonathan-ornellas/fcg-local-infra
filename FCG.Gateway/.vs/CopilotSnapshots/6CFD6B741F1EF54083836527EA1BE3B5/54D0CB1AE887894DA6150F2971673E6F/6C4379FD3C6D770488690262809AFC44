@@ -1,0 +1,45 @@
+﻿version: "3.9"
+services:
+  fcg-payments-api:
+    build: .
+    container_name: fcg-payments-api
+    ports:
+      - "5003:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=fcg-payments-db;Database=fcg-paymentsdb;User Id=fiap;Password=fiap@123;TrustServerCertificate=True
+      - Jwt__Issuer=fcg
+      - Jwt__Audience=fcg
+      - Jwt__Key=63034f05-afd0-4f63-bdfa-a48ee5e1f976
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__User=guest
+      - RabbitMQ__Password=guest
+      - RabbitMQ__Exchange=fcg.events
+      - OpenTelemetry__OtlpEndpoint=http://jaeger:4317
+    depends_on:
+      - fcg-payments-db
+      - rabbitmq
+      - jaeger
+
+  fcg-payments-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: fcg-payments-db
+    environment:
+      - SA_PASSWORD=fiap@123
+      - ACCEPT_EULA=Y
+    ports:
+      - "14333:1433"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"

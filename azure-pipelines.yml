@@ -1,0 +1,21 @@
+trigger:
+- main
+
+pr:
+- main
+
+stages:
+- stage: CI
+  jobs:
+  - job: validate
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: sdk
+        version: 8.x
+    - script: |
+        echo "Infra repo - validate compose syntax"
+        docker compose config
+      displayName: Validate docker-compose
