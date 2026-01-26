@@ -45,6 +45,9 @@ stages:
     # --- Docker login ---
     - task: Bash@3
       displayName: Docker login
+      env:
+        DOCKERHUB_USERNAME: $(DOCKERHUB_USERNAME)
+        DOCKERHUB_TOKEN: $(DOCKERHUB_TOKEN)
       inputs:
         targetType: inline
         script: |
