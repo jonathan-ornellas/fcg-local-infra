@@ -23,14 +23,10 @@ stages:
         packageType: sdk
         version: 8.x
 
-    - task: Bash@3
+    - script: |
+        dotnet restore gateway/Fcg.Gateway/Fcg.Gateway.csproj
+        dotnet build   gateway/Fcg.Gateway/Fcg.Gateway.csproj -c Release --no-restore
       displayName: Build gateway
-      inputs:
-        targetType: inline
-        script: |
-          set -e
-          dotnet restore gateway/Fcg.Gateway/Fcg.Gateway.csproj
-          dotnet build   gateway/Fcg.Gateway/Fcg.Gateway.csproj -c Release --no-restore
 
 # =========================
 # CD — Docker + Deploy
