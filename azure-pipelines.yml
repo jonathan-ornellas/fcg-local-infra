@@ -43,9 +43,13 @@ stages:
     steps:
 
     # --- Docker login ---
-    - script: |
-        echo "$(DOCKERHUB_TOKEN)" | docker login -u "$(DOCKERHUB_USERNAME)" --password-stdin
+    - task: Bash@3
       displayName: Docker login
+      inputs:
+        targetType: inline
+        script: |
+          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+
 
     # --- Build & push image ---
     - script: |
