@@ -23,10 +23,14 @@ stages:
         packageType: sdk
         version: 8.x
 
-    - script: |
-        dotnet restore gateway/Fcg.Gateway/Fcg.Gateway.csproj
-        dotnet build   gateway/Fcg.Gateway/Fcg.Gateway.csproj -c Release --no-restore
+    - task: Bash@3
       displayName: Build gateway
+      inputs:
+        targetType: inline
+        script: |
+          set -e
+          dotnet restore gateway/Fcg.Gateway/Fcg.Gateway.csproj
+          dotnet build   gateway/Fcg.Gateway/Fcg.Gateway.csproj -c Release --no-restore
 
 # =========================
 # CD — Docker + Deploy
@@ -48,20 +52,24 @@ stages:
       inputs:
         targetType: inline
         script: |
+          set -e
           echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
-
     # --- Build & push image ---
-    - script: |
-        docker build \
-          -f gateway/Fcg.Gateway/Dockerfile \
-          -t $(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId) \
-          -t $(DOCKERHUB_USERNAME)/fcg-gateway:latest \
-          .
-
-        docker push $(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)
-        docker push $(DOCKERHUB_USERNAME)/fcg-gateway:latest
+    - task: Bash@3
       displayName: Docker build & push gateway
+      inputs:
+        targetType: inline
+        script: |
+          set -e
+          docker build \
+            -f gateway/Fcg.Gateway/Dockerfile \
+            -t $DOCKERHUB_USERNAME/fcg-gateway:$(Build.BuildId) \
+            -t $DOCKERHUB_USERNAME/fcg-gateway:latest \
+            .
+
+          docker push $DOCKERHUB_USERNAME/fcg-gateway:$(Build.BuildId)
+          docker push $DOCKERHUB_USERNAME/fcg-gateway:latest
 
     # --- Download EC2 SSH key ---
     - task: DownloadSecureFile@1
@@ -75,6 +83,8 @@ stages:
       inputs:
         targetType: inline
         script: |
+          set -e
+
           KEY_SRC=$(echo "$(ec2key.secureFilePath)" | sed 's#\\#/#g' | sed 's#^\([A-Za-z]\):#/mnt/\L\1#')
           KEY_DST=~/.ssh/fiap-kp.pem
 
@@ -83,7 +93,7 @@ stages:
           chmod 600 "$KEY_DST"
 
           ssh -i "$KEY_DST" -o StrictHostKeyChecking=no ubuntu@$(EC2_Public_IP) '
-            docker pull $(DOCKERHUB_USERNAME)/fcg-gateway:latest &&
+            docker pull '"$DOCKERHUB_USERNAME"'/fcg-gateway:latest &&
             docker stop fcg-gateway || true
             docker rm fcg-gateway || true
             docker run -d \
@@ -91,5 +101,4 @@ stages:
               --restart unless-stopped \
               --network fcg-net \
               -p 8080:8080 \
-              $(DOCKERHUB_USERNAME)/fcg-gateway:latest
-          '
+              '"$DOCKERHUB_USERNAME"'/fcg-gateway:latest'
