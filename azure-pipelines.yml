@@ -61,17 +61,9 @@ stages:
 
     # --- Deploy gateway to EC2 ---
     - script: |
-        ssh -i $(ec2key.secureFilePath) -o StrictHostKeyChecking=no ubuntu@$(EC2_Public_IP) "
-          docker pull $(DOCKERHUB_USERNAME)/fcg-gateway:latest
+        echo "$(DOCKERHUB_TOKEN)" | docker login -u "$(DOCKERHUB_USERNAME)" --password-stdin
+        docker build -f gateway/Dockerfile -t "$(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)" -t "$(DOCKERHUB_USERNAME)/fcg-gateway:latest" .
+        docker push "$(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)"
+        docker push "$(DOCKERHUB_USERNAME)/fcg-gateway:latest"
+      displayName: Docker build & push gateway
 
-          docker stop fcg-gateway || true
-          docker rm fcg-gateway || true
-
-          docker run -d \
-            --name fcg-gateway \
-            --restart unless-stopped \
-            --network fcg-net \
-            -p 8080:8080 \
-            $(DOCKERHUB_USERNAME)/fcg-gateway:latest
-        "
-      displayName: Deploy gateway to EC2
