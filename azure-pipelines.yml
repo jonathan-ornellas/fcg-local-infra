@@ -42,17 +42,10 @@ stages:
       name: self-hosted
     steps:
 
-    # --- Docker login ---
-    - task: Bash@3
+    # --- Docker login ---    - script: |
+    - script: |
+        echo "$(DOCKERHUB_TOKEN)" | docker login -u "$(DOCKERHUB_USERNAME)" --password-stdin
       displayName: Docker login
-      env:
-        DOCKERHUB_USERNAME: $(DOCKERHUB_USERNAME)
-        DOCKERHUB_TOKEN: $(DOCKERHUB_TOKEN)
-      inputs:
-        targetType: inline
-        script: |
-          set -e
-          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
     # --- Build & push image ---
     - task: Bash@3
