@@ -32,14 +32,18 @@ stages:
 # CD — Docker + Deploy
 # =========================
 - stage: CD
+  displayName: CD - docker build/push and deploy
   dependsOn: CI
+  condition: succeeded()
   jobs:
   - job: docker_push_and_deploy_gateway
     pool:
       name: self-hosted
     steps:
+
+    # 🔐 Docker Hub auth (clean + login)
     - task: Docker@2
-      displayName: Docker logout (force clean)
+      displayName: Docker logout
       inputs:
         command: logout
 
@@ -49,6 +53,7 @@ stages:
         command: login
         containerRegistry: dockerhub-connection
 
+    # 🐳 Build & Push (ÚNICO lugar onde isso acontece)
     - task: Docker@2
       displayName: Build and push gateway
       inputs:
@@ -60,29 +65,13 @@ stages:
         tags: |
           latest
 
-    # --- Build & push image ---
-    - task: Bash@3
-      displayName: Docker build & push gateway
-      inputs:
-        targetType: inline
-        script: |
-          set -e
-          docker build \
-            -f gateway/Fcg.Gateway/Dockerfile \
-            -t $DOCKERHUB_USERNAME/fcg-gateway:$(Build.BuildId) \
-            -t $DOCKERHUB_USERNAME/fcg-gateway:latest \
-            .
-
-          docker push $DOCKERHUB_USERNAME/fcg-gateway:$(Build.BuildId)
-          docker push $DOCKERHUB_USERNAME/fcg-gateway:latest
-
-    # --- Download EC2 SSH key ---
+    # 🔑 Download da chave EC2
     - task: DownloadSecureFile@1
       name: ec2key
       inputs:
         secureFile: fiap-kp.pem
 
-    # --- Deploy gateway to EC2 ---
+    # 🚀 Deploy no EC2
     - task: Bash@3
       displayName: Deploy gateway to EC2
       inputs:
@@ -98,12 +87,12 @@ stages:
           chmod 600 "$KEY_DST"
 
           ssh -i "$KEY_DST" -o StrictHostKeyChecking=no ubuntu@$(EC2_Public_IP) '
-            docker pull '"$DOCKERHUB_USERNAME"'/fcg-gateway:latest &&
-            docker stop fcg-gateway || true
-            docker rm fcg-gateway || true
+            docker pull jonathanornellas/fcg-gateway:latest &&
+            docker stop fcg-gateway || true &&
+            docker rm fcg-gateway || true &&
             docker run -d \
               --name fcg-gateway \
               --restart unless-stopped \
               --network fcg-net \
               -p 8080:8080 \
-              '"$DOCKERHUB_USERNAME"'/fcg-gateway:latest'
+              jonathanornellas/fcg-gateway:latest'
