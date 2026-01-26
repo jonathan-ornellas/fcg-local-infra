@@ -32,20 +32,22 @@ stages:
 # CD — Docker + Deploy
 # =========================
 - stage: CD
-  displayName: CD - build/push and deploy gateway
   dependsOn: CI
-  condition: succeeded()
   jobs:
   - job: docker_push_and_deploy_gateway
-    displayName: Build, push and deploy gateway
     pool:
       name: self-hosted
     steps:
-
-    # --- Docker login ---    - script: |
-    - script: |
-        echo "$(DOCKERHUB_TOKEN)" | docker login -u "$(DOCKERHUB_USERNAME)" --password-stdin
-      displayName: Docker login
+    - task: Docker@2
+      displayName: Build and push gateway
+      inputs:
+        command: buildAndPush
+        containerRegistry: dockerhub-connection
+        repository: fcg-gateway
+        dockerfile: gateway/Fcg.Gateway/Dockerfile
+        buildContext: .
+        tags: |
+          latest
 
     # --- Build & push image ---
     - task: Bash@3
