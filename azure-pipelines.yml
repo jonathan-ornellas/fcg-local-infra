@@ -9,7 +9,7 @@ variables:
 
 stages:
 # =========================
-# CI — Build & Test
+# CI — Build
 # =========================
 - stage: CI
   displayName: CI - build gateway
@@ -32,7 +32,7 @@ stages:
 # CD — Docker + Deploy
 # =========================
 - stage: CD
-  displayName: CD - build/push gateway and deploy to AWS
+  displayName: CD - build/push and deploy gateway
   dependsOn: CI
   condition: succeeded()
   jobs:
@@ -42,15 +42,21 @@ stages:
       name: self-hosted
     steps:
 
-    # --- Login + build + push image ---
+    # --- Docker login ---
     - script: |
         echo "$(DOCKERHUB_TOKEN)" | docker login -u "$(DOCKERHUB_USERNAME)" --password-stdin
+      displayName: Docker login
 
-        docker build -t "$(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)" -f gateway/Fcg.Gateway/Dockerfile .
-        docker tag "$(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)" "$(DOCKERHUB_USERNAME)/fcg-gateway:latest"
+    # --- Build & push image ---
+    - script: |
+        docker build \
+          -f gateway/Fcg.Gateway/Dockerfile \
+          -t $(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId) \
+          -t $(DOCKERHUB_USERNAME)/fcg-gateway:latest \
+          .
 
-        docker push "$(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)"
-        docker push "$(DOCKERHUB_USERNAME)/fcg-gateway:latest"
+        docker push $(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)
+        docker push $(DOCKERHUB_USERNAME)/fcg-gateway:latest
       displayName: Docker build & push gateway
 
     # --- Download EC2 SSH key ---
@@ -60,10 +66,26 @@ stages:
         secureFile: fiap-kp.pem
 
     # --- Deploy gateway to EC2 ---
-    - script: |
-        echo "$(DOCKERHUB_TOKEN)" | docker login -u "$(DOCKERHUB_USERNAME)" --password-stdin
-        docker build -f gateway/Dockerfile -t "$(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)" -t "$(DOCKERHUB_USERNAME)/fcg-gateway:latest" .
-        docker push "$(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)"
-        docker push "$(DOCKERHUB_USERNAME)/fcg-gateway:latest"
-      displayName: Docker build & push gateway
+    - task: Bash@3
+      displayName: Deploy gateway to EC2
+      inputs:
+        targetType: inline
+        script: |
+          KEY_SRC=$(echo "$(ec2key.secureFilePath)" | sed 's#\\#/#g' | sed 's#^\([A-Za-z]\):#/mnt/\L\1#')
+          KEY_DST=~/.ssh/fiap-kp.pem
 
+          mkdir -p ~/.ssh
+          cp "$KEY_SRC" "$KEY_DST"
+          chmod 600 "$KEY_DST"
+
+          ssh -i "$KEY_DST" -o StrictHostKeyChecking=no ubuntu@$(EC2_Public_IP) '
+            docker pull $(DOCKERHUB_USERNAME)/fcg-gateway:latest &&
+            docker stop fcg-gateway || true
+            docker rm fcg-gateway || true
+            docker run -d \
+              --name fcg-gateway \
+              --restart unless-stopped \
+              --network fcg-net \
+              -p 8080:8080 \
+              $(DOCKERHUB_USERNAME)/fcg-gateway:latest
+          '
