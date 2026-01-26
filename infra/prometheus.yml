@@ -2,15 +2,8 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'gateway'
+  - job_name: "fcg-gateway"
+    metrics_path: /metrics
     static_configs:
-      - targets: ['gateway:8080']
-  - job_name: 'users'
-    static_configs:
-      - targets: ['users-api:8080']
-  - job_name: 'games'
-    static_configs:
-      - targets: ['games-api:8080']
-  - job_name: 'payments'
-    static_configs:
-      - targets: ['payments-api:8080']
+      - targets:
+          - "fcg-gateway:8080"

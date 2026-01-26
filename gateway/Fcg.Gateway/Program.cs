@@ -29,12 +29,20 @@ var app = builder.Build();
 app.UseSerilogRequestLogging();
 
 app.UseRouting();
-app.UseHttpMetrics();
+
+// Prometheus - Métricas HTTP (requests, duração, status codes)
+app.UseHttpMetrics(options =>
+{
+    options.AddCustomLabel("service", ctx => "fcg-gateway");
+    options.AddCustomLabel("method", ctx => ctx.Request.Method);
+});
+
+// Endpoint para expor métricas no formato Prometheus
 app.MapMetrics();
 
 app.MapHealthChecks("/health");
 
-app.MapGet("/", () => Results.Ok(new { service="fcg-gateway", routes="YARP" }));
+app.MapGet("/", () => Results.Ok(new { service="fcg-gateway", routes="YARP", metrics="/metrics" }));
 app.MapReverseProxy();
 
 app.Run();
