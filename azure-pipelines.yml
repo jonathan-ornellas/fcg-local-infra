@@ -4,18 +4,74 @@ trigger:
 pr:
 - main
 
+variables:
+- group: fcg-shared-vars
+
 stages:
+# =========================
+# CI — Build & Test
+# =========================
 - stage: CI
+  displayName: CI - build gateway
   jobs:
-  - job: validate
+  - job: build_gateway
     pool:
-      vmImage: ubuntu-latest
+      name: self-hosted
     steps:
     - task: UseDotNet@2
       inputs:
         packageType: sdk
         version: 8.x
+
     - script: |
-        echo "Infra repo - validate compose syntax"
-        docker compose config
-      displayName: Validate docker-compose
+        dotnet restore gateway/Fcg.Gateway/Fcg.Gateway.csproj
+        dotnet build   gateway/Fcg.Gateway/Fcg.Gateway.csproj -c Release --no-restore
+      displayName: Build gateway
+
+# =========================
+# CD — Docker + Deploy
+# =========================
+- stage: CD
+  displayName: CD - build/push gateway and deploy to AWS
+  dependsOn: CI
+  condition: succeeded()
+  jobs:
+  - job: docker_push_and_deploy_gateway
+    displayName: Build, push and deploy gateway
+    pool:
+      name: self-hosted
+    steps:
+
+    # --- Login + build + push image ---
+    - script: |
+        echo "$(DOCKERHUB_TOKEN)" | docker login -u "$(DOCKERHUB_USERNAME)" --password-stdin
+
+        docker build -t "$(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)" -f gateway/Fcg.Gateway/Dockerfile .
+        docker tag "$(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)" "$(DOCKERHUB_USERNAME)/fcg-gateway:latest"
+
+        docker push "$(DOCKERHUB_USERNAME)/fcg-gateway:$(Build.BuildId)"
+        docker push "$(DOCKERHUB_USERNAME)/fcg-gateway:latest"
+      displayName: Docker build & push gateway
+
+    # --- Download EC2 SSH key ---
+    - task: DownloadSecureFile@1
+      name: ec2key
+      inputs:
+        secureFile: fiap-kp.pem
+
+    # --- Deploy gateway to EC2 ---
+    - script: |
+        ssh -i $(ec2key.secureFilePath) -o StrictHostKeyChecking=no ubuntu@$(EC2_Public_IP) "
+          docker pull $(DOCKERHUB_USERNAME)/fcg-gateway:latest
+
+          docker stop fcg-gateway || true
+          docker rm fcg-gateway || true
+
+          docker run -d \
+            --name fcg-gateway \
+            --restart unless-stopped \
+            --network fcg-net \
+            -p 8080:8080 \
+            $(DOCKERHUB_USERNAME)/fcg-gateway:latest
+        "
+      displayName: Deploy gateway to EC2
