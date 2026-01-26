@@ -44,8 +44,8 @@ stages:
         command: buildAndPush
         containerRegistry: dockerhub-connection
         repository: fcg-gateway
-        dockerfile: gateway/Fcg.Gateway/Dockerfile
-        buildContext: .
+        dockerfile: gateway/Dockerfile
+        buildContext: gateway
         tags: |
           latest
 
