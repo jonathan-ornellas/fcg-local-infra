@@ -65,17 +65,25 @@ O gateway utiliza YARP para mapear os caminhos externos para os serviços intern
 flowchart LR
   C["Client"] --> GW["API Gateway - YARP"]
 
+  %% Rotas normais
   GW --> U["Users API"]
   GW --> G["Games API"]
   GW --> P["Payments API"]
 
+  %% Rota de recomendações via Lambda
+  GW --> L["AWS Lambda - Recommendations"]
+  L --> G
+
+  %% Mensageria
   G -->|"games.purchase.requested"| MQ[("RabbitMQ")]
   MQ --> P
   P -->|"payments.payment.succeeded"| MQ
   MQ --> G
 
+  %% Busca e indexação
   G --> ES[("Elasticsearch")]
 
+  %% Bancos
   U --> DB1[("Users DB")]
   G --> DB2[("Games DB")]
   P --> DB3[("Payments DB")]
