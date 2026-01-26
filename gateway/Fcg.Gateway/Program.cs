@@ -34,7 +34,6 @@ app.UseRouting();
 app.UseHttpMetrics(options =>
 {
     options.AddCustomLabel("service", ctx => "fcg-gateway");
-    options.AddCustomLabel("method", ctx => ctx.Request.Method);
 });
 
 // Endpoint para expor métricas no formato Prometheus
