@@ -54,7 +54,7 @@ stages:
       inputs:
         command: buildAndPush
         containerRegistry: dockerhub-connection
-        repository: fcg-gateway
+        repository: jonathanornellas/fcg-gateway
         dockerfile: gateway/Dockerfile
         buildContext: gateway
         tags: |
