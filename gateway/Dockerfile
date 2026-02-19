@@ -15,7 +15,6 @@ COPY Fcg.Gateway/ Fcg.Gateway/
 RUN dotnet publish Fcg.Gateway/Fcg.Gateway.csproj \
     -c Release \
     -o /app/publish \
-    --no-restore \
     /p:UseAppHost=false
 
 # =========================
