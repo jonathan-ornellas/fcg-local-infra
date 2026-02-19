@@ -1,26 +1,26 @@
 # =============================================================================
-# Helm Values — RabbitMQ (bitnami/rabbitmq)
-#
-# Instalar:
-# helm repo add bitnami https://charts.bitnami.com/bitnami
-# helm install rabbitmq bitnami/rabbitmq \
-#   -n fcg \
-#   -f helm-values/rabbitmq-values.yaml
+# Helm Values — RabbitMQ (bitnami/rabbitmq) — VERSÃO AWS PUBLIC ECR
 # =============================================================================
+
+global:
+  security:
+    allowInsecureImages: true
 
 auth:
   username: guest
-  # Em produção, use um Secret existente em vez de hardcode:
-  # existingPasswordSecret: fcg-rabbitmq-secret
-  password: "TROQUE_ANTES_DE_APLICAR"
+  password: "guest"
 
-# Persistência para não perder filas em restart
+image:
+  registry: public.ecr.aws
+  repository: bitnami/rabbitmq
+  tag: latest
+  pullPolicy: Always
+
 persistence:
   enabled: true
   size: 8Gi
-  storageClass: "gp2"  # StorageClass padrão do EKS
+  storageClass: "gp2"
 
-# Recursos
 resources:
   requests:
     cpu: 200m
@@ -29,29 +29,32 @@ resources:
     cpu: 500m
     memory: 512Mi
 
-# Clustering com 3 réplicas para alta disponibilidade
-replicaCount: 3
+replicaCount: 1
 
-# Plugins úteis
 plugins: "rabbitmq_management rabbitmq_peer_discovery_k8s"
 
-# Service interno
 service:
   type: ClusterIP
   port: 5672
   managerPort: 15672
 
-# Metrics para Prometheus
 metrics:
   enabled: true
   serviceMonitor:
     enabled: true
     namespace: fcg
 
-# Exchange e filas criadas automaticamente no boot
 extraConfiguration: |
   default_vhost = /
   default_user = guest
   default_permissions.configure = .*
   default_permissions.read = .*
   default_permissions.write = .*
+
+volumePermissions:
+  enabled: false
+
+podSecurityContext:
+  fsGroup: 1001
+containerSecurityContext:
+  runAsUser: 1001

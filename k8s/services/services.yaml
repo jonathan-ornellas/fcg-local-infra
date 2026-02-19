@@ -1,8 +1,7 @@
-# Service — Users
 apiVersion: v1
 kind: Service
 metadata:
-  name: fcg-users-service
+  name: fcg-users-api
   namespace: fcg
   labels:
     app: fcg-users
@@ -16,11 +15,10 @@ spec:
   type: ClusterIP
 
 ---
-# Service — Games
 apiVersion: v1
 kind: Service
 metadata:
-  name: fcg-games-service
+  name: fcg-games-api
   namespace: fcg
   labels:
     app: fcg-games
@@ -34,11 +32,10 @@ spec:
   type: ClusterIP
 
 ---
-# Service — Payments
 apiVersion: v1
 kind: Service
 metadata:
-  name: fcg-payments-service
+  name: fcg-payments-api
   namespace: fcg
   labels:
     app: fcg-payments
@@ -52,25 +49,19 @@ spec:
   type: ClusterIP
 
 ---
-# Service — Gateway (LoadBalancer expõe para fora via ALB no EKS)
 apiVersion: v1
 kind: Service
 metadata:
   name: fcg-gateway-service
-  namespace: fcg
+  namespace: fcg 
   labels:
     app: fcg-gateway
-  annotations:
-    # AWS Load Balancer Controller: cria um ALB automaticamente
-    service.beta.kubernetes.io/aws-load-balancer-type: "external"
-    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
-    service.beta.kubernetes.io/aws-load-balancer-source-ranges: "38.226.185.200/32"
 spec:
+  type: NodePort 
   selector:
     app: fcg-gateway
   ports:
     - name: http
       port: 80
       targetPort: 8080
-  type: LoadBalancer
+      nodePort: 30080
