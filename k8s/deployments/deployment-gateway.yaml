@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fcg-gateway
+  namespace: fcg
+  labels:
+    app: fcg-gateway
+    tier: gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fcg-gateway
+  template:
+    metadata:
+      labels:
+        app: fcg-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8080"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: [fcg-gateway]
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: fcg-gateway
+          image: <SEU_ECR>/fcg-gateway:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          envFrom:
+            - configMapRef:
+                name: fcg-gateway-config
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+      terminationGracePeriodSeconds: 30

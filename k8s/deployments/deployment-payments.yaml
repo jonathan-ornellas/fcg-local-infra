@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fcg-payments
+  namespace: fcg
+  labels:
+    app: fcg-payments
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fcg-payments
+  template:
+    metadata:
+      labels:
+        app: fcg-payments
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8080"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: [fcg-payments]
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: fcg-payments
+          image: <SEU_ECR>/fcg-payments-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          envFrom:
+            - configMapRef:
+                name: fcg-payments-config
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-payments-db-secret
+                  key: ConnectionStrings__DefaultConnection
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-jwt-secret
+                  key: Jwt__Key
+            - name: RabbitMQ__Password
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-rabbitmq-secret
+                  key: RabbitMQ__Password
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+      terminationGracePeriodSeconds: 30

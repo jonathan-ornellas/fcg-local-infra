@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fcg-payments-config
+  namespace: fcg
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  RabbitMQ__Host: "rabbitmq.fcg.svc.cluster.local"
+  RabbitMQ__User: "guest"
+  RabbitMQ__Exchange: "fcg.events"
+  Jwt__Issuer: "fcg"
+  Jwt__Audience: "fcg"
+  OpenTelemetry__OtlpEndpoint: "http://jaeger.fcg.svc.cluster.local:4317"

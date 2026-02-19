@@ -1,0 +1,253 @@
+# =============================================================================
+# SQL Server dentro do cluster Kubernetes
+# 3 instâncias independentes: users, games, payments
+# Imagem: mcr.microsoft.com/mssql/server:2022-latest (mesma do docker-compose)
+# =============================================================================
+
+# ─── SECRET com senha do SA (compartilhada pelos 3) ───────────────────────
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fcg-sqlserver-secret
+  namespace: fcg
+type: Opaque
+data:
+  # echo -n "Fiap@2024" | base64  →  RmlhcEAyMDI0
+  SA_PASSWORD: RmlhcEAyMDI0
+
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# USERS DATABASE
+# ═══════════════════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: users-db
+  namespace: fcg
+  labels:
+    app: users-db
+spec:
+  serviceName: users-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: users-db
+  template:
+    metadata:
+      labels:
+        app: users-db
+    spec:
+      containers:
+        - name: sqlserver
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - containerPort: 1433
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-sqlserver-secret
+                  key: SA_PASSWORD
+            - name: MSSQL_PID
+              value: "Developer"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "1Gi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $SA_PASSWORD -Q 'SELECT 1' -C || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 6
+          volumeMounts:
+            - name: users-db-data
+              mountPath: /var/opt/mssql
+  volumeClaimTemplates:
+    - metadata:
+        name: users-db-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: users-db
+  namespace: fcg
+spec:
+  selector:
+    app: users-db
+  ports:
+    - port: 1433
+      targetPort: 1433
+  clusterIP: None   # headless — acesso direto via users-db.fcg.svc.cluster.local
+
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# GAMES DATABASE
+# ═══════════════════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: games-db
+  namespace: fcg
+  labels:
+    app: games-db
+spec:
+  serviceName: games-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: games-db
+  template:
+    metadata:
+      labels:
+        app: games-db
+    spec:
+      containers:
+        - name: sqlserver
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - containerPort: 1433
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-sqlserver-secret
+                  key: SA_PASSWORD
+            - name: MSSQL_PID
+              value: "Developer"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "1Gi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $SA_PASSWORD -Q 'SELECT 1' -C || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 6
+          volumeMounts:
+            - name: games-db-data
+              mountPath: /var/opt/mssql
+  volumeClaimTemplates:
+    - metadata:
+        name: games-db-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: games-db
+  namespace: fcg
+spec:
+  selector:
+    app: games-db
+  ports:
+    - port: 1433
+      targetPort: 1433
+  clusterIP: None
+
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# PAYMENTS DATABASE
+# ═══════════════════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: payments-db
+  namespace: fcg
+  labels:
+    app: payments-db
+spec:
+  serviceName: payments-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payments-db
+  template:
+    metadata:
+      labels:
+        app: payments-db
+    spec:
+      containers:
+        - name: sqlserver
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - containerPort: 1433
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-sqlserver-secret
+                  key: SA_PASSWORD
+            - name: MSSQL_PID
+              value: "Developer"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "1Gi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $SA_PASSWORD -Q 'SELECT 1' -C || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 6
+          volumeMounts:
+            - name: payments-db-data
+              mountPath: /var/opt/mssql
+  volumeClaimTemplates:
+    - metadata:
+        name: payments-db-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments-db
+  namespace: fcg
+spec:
+  selector:
+    app: payments-db
+  ports:
+    - port: 1433
+      targetPort: 1433
+  clusterIP: None

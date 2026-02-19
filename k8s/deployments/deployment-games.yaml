@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fcg-games
+  namespace: fcg
+  labels:
+    app: fcg-games
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fcg-games
+  template:
+    metadata:
+      labels:
+        app: fcg-games
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8080"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: [fcg-games]
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: fcg-games
+          image: <SEU_ECR>/fcg-games-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            requests:
+              cpu: "150m"
+              memory: "256Mi"
+            limits:
+              cpu: "750m"
+              memory: "768Mi"
+          envFrom:
+            - configMapRef:
+                name: fcg-games-config
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-games-db-secret
+                  key: ConnectionStrings__DefaultConnection
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-jwt-secret
+                  key: Jwt__Key
+            - name: RabbitMQ__Password
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-rabbitmq-secret
+                  key: RabbitMQ__Password
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+      terminationGracePeriodSeconds: 30

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fcg-gateway-config
+  namespace: fcg
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  OpenTelemetry__OtlpEndpoint: "http://jaeger.fcg.svc.cluster.local:4317"
+  # Endpoints internos para o YARP rotear
+  Services__UsersUrl: "http://fcg-users-service.fcg.svc.cluster.local:8080"
+  Services__GamesUrl: "http://fcg-games-service.fcg.svc.cluster.local:8080"
+  Services__PaymentsUrl: "http://fcg-payments-service.fcg.svc.cluster.local:8080"

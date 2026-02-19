@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fcg-users-config
+  namespace: fcg
+data:
+  # Aplicação
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  # RabbitMQ (host interno do cluster via Service)
+  RabbitMQ__Host: "rabbitmq.fcg.svc.cluster.local"
+  RabbitMQ__User: "guest"
+  RabbitMQ__Exchange: "fcg.events"
+  # JWT (não-secreto)
+  Jwt__Issuer: "fcg"
+  Jwt__Audience: "fcg"
+  # OpenTelemetry
+  OpenTelemetry__OtlpEndpoint: "http://jaeger.fcg.svc.cluster.local:4317"
+  # Health / Métricas
+  HealthChecks__Enabled: "true"

@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "fcg-gateway"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["fcg-gateway:8080"]
+
+  - job_name: "fcg-users"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["fcg-users-api:8080"]
+
+  - job_name: "fcg-games"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["fcg-games-api:8080"]
+
+  - job_name: "fcg-payments"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["fcg-payments-api:8080"]

@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fcg-users
+  namespace: fcg
+  labels:
+    app: fcg-users
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fcg-users
+  template:
+    metadata:
+      labels:
+        app: fcg-users
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8080"
+    spec:
+      # Garante que pods não fiquem todos no mesmo nó
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: [fcg-users]
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: fcg-users
+          # Substitua pelo seu ECR: <account-id>.dkr.ecr.<region>.amazonaws.com/fcg-users-service:latest
+          image: <SEU_ECR>/fcg-users-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          # Recursos: ajuste conforme o perfil real de carga
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # Variáveis do ConfigMap
+          envFrom:
+            - configMapRef:
+                name: fcg-users-config
+          # Variáveis dos Secrets
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-users-db-secret
+                  key: ConnectionStrings__DefaultConnection
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-jwt-secret
+                  key: Jwt__Key
+            - name: RabbitMQ__Password
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-rabbitmq-secret
+                  key: RabbitMQ__Password
+          # Health probes usando o /health já existente
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+      # Garante graceful shutdown do .NET
+      terminationGracePeriodSeconds: 30

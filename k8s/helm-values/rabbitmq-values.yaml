@@ -1,0 +1,57 @@
+# =============================================================================
+# Helm Values — RabbitMQ (bitnami/rabbitmq)
+#
+# Instalar:
+# helm repo add bitnami https://charts.bitnami.com/bitnami
+# helm install rabbitmq bitnami/rabbitmq \
+#   -n fcg \
+#   -f helm-values/rabbitmq-values.yaml
+# =============================================================================
+
+auth:
+  username: guest
+  # Em produção, use um Secret existente em vez de hardcode:
+  # existingPasswordSecret: fcg-rabbitmq-secret
+  password: "TROQUE_ANTES_DE_APLICAR"
+
+# Persistência para não perder filas em restart
+persistence:
+  enabled: true
+  size: 8Gi
+  storageClass: "gp2"  # StorageClass padrão do EKS
+
+# Recursos
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Clustering com 3 réplicas para alta disponibilidade
+replicaCount: 3
+
+# Plugins úteis
+plugins: "rabbitmq_management rabbitmq_peer_discovery_k8s"
+
+# Service interno
+service:
+  type: ClusterIP
+  port: 5672
+  managerPort: 15672
+
+# Metrics para Prometheus
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: fcg
+
+# Exchange e filas criadas automaticamente no boot
+extraConfiguration: |
+  default_vhost = /
+  default_user = guest
+  default_permissions.configure = .*
+  default_permissions.read = .*
+  default_permissions.write = .*

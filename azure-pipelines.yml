@@ -1,0 +1,98 @@
+trigger:
+- main
+
+pr:
+- main
+
+variables:
+- group: fcg-shared-vars
+
+stages:
+# =========================
+# CI — Build
+# =========================
+- stage: CI
+  displayName: CI - build gateway
+  jobs:
+  - job: build_gateway
+    pool:
+      name: self-hosted
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: sdk
+        version: 8.x
+
+    - script: |
+        dotnet restore gateway/Fcg.Gateway/Fcg.Gateway.csproj
+        dotnet build   gateway/Fcg.Gateway/Fcg.Gateway.csproj -c Release --no-restore
+      displayName: Build gateway
+
+# =========================
+# CD — Docker + Deploy
+# =========================
+- stage: CD
+  displayName: CD - docker build/push and deploy
+  dependsOn: CI
+  condition: succeeded()
+  jobs:
+  - job: docker_push_and_deploy_gateway
+    pool:
+      name: self-hosted
+    steps:
+
+    # 🔐 Docker Hub auth (clean + login)
+    - task: Docker@2
+      displayName: Docker logout
+      inputs:
+        command: logout
+
+    - task: Docker@2
+      displayName: Docker login
+      inputs:
+        command: login
+        containerRegistry: dockerhub-connection
+
+    # 🐳 Build & Push (ÚNICO lugar onde isso acontece)
+    - task: Docker@2
+      displayName: Build and push gateway
+      inputs:
+        command: buildAndPush
+        containerRegistry: dockerhub-connection
+        repository: jonathanornellas/fcg-gateway
+        dockerfile: gateway/Dockerfile
+        buildContext: gateway
+        tags: |
+          latest
+
+    # 🔑 Download da chave EC2
+    - task: DownloadSecureFile@1
+      name: ec2key
+      inputs:
+        secureFile: fiap-kp.pem
+
+    # 🚀 Deploy no EC2
+    - task: Bash@3
+      displayName: Deploy gateway to EC2
+      inputs:
+        targetType: inline
+        script: |
+          set -e
+
+          KEY_SRC=$(echo "$(ec2key.secureFilePath)" | sed 's#\\#/#g' | sed 's#^\([A-Za-z]\):#/mnt/\L\1#')
+          KEY_DST=~/.ssh/fiap-kp.pem
+
+          mkdir -p ~/.ssh
+          cp "$KEY_SRC" "$KEY_DST"
+          chmod 600 "$KEY_DST"
+
+          ssh -i "$KEY_DST" -o StrictHostKeyChecking=no ubuntu@$(EC2_Public_IP) '
+            docker pull jonathanornellas/fcg-gateway:latest &&
+            docker stop fcg-gateway || true &&
+            docker rm fcg-gateway || true &&
+            docker run -d \
+              --name fcg-gateway \
+              --restart unless-stopped \
+              --network fcg-net \
+              -p 8080:8080 \
+              jonathanornellas/fcg-gateway:latest'

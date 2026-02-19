@@ -1,0 +1,83 @@
+# =============================================================================
+# Helm Values — kube-prometheus-stack (Prometheus + Grafana + AlertManager)
+#
+# Instalar:
+# helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+# helm install monitoring prometheus-community/kube-prometheus-stack \
+#   -n fcg \
+#   -f helm-values/prometheus-stack-values.yaml
+# =============================================================================
+
+grafana:
+  enabled: true
+  adminPassword: "TROQUE_ANTES_DE_APLICAR"
+  service:
+    type: ClusterIP
+  # Dashboard de .NET pronto para usar
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          orgId: 1
+          folder: ""
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+  dashboards:
+    default:
+      dotnet-runtime:
+        # Dashboard ASP.NET Core do Grafana Community
+        gnetId: 19924
+        revision: 2
+        datasource: Prometheus
+      kubernetes-cluster:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+
+prometheus:
+  enabled: true
+  prometheusSpec:
+    # Coleta métricas de todos os pods com annotation prometheus.io/scrape=true
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    additionalScrapeConfigs:
+      - job_name: fcg-services
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [fcg]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+    retention: 15d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          resources:
+            requests:
+              storage: 20Gi
+
+alertmanager:
+  enabled: true
+
+# Não instala node-exporter no Fargate — desabilite se usar EKS Fargate
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true

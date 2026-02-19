@@ -1,0 +1,140 @@
+# =============================================================================
+# Migration Jobs — rodam antes dos Deployments principais
+# Resolve o problema de race condition do Database.Migrate() no startup
+# com múltiplas réplicas.
+#
+# Como usar: kubectl apply -f jobs/migration-jobs.yaml
+# Aguarde os jobs completarem antes de aplicar os Deployments:
+# kubectl wait --for=condition=complete job/fcg-users-migration -n fcg --timeout=120s
+# =============================================================================
+
+# Job — Users Migration
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fcg-users-migration
+  namespace: fcg
+  labels:
+    app: fcg-users-migration
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migration
+          image: <SEU_ECR>/fcg-users-service:latest
+          # Sobrescreve o entrypoint para rodar apenas a migration
+          command: ["dotnet", "Fcg.Users.Api.dll", "--migrate-only"]
+          envFrom:
+            - configMapRef:
+                name: fcg-users-config
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-users-db-secret
+                  key: ConnectionStrings__DefaultConnection
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-jwt-secret
+                  key: Jwt__Key
+            - name: RabbitMQ__Password
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-rabbitmq-secret
+                  key: RabbitMQ__Password
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "300m"
+              memory: "512Mi"
+
+---
+# Job — Games Migration
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fcg-games-migration
+  namespace: fcg
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migration
+          image: <SEU_ECR>/fcg-games-service:latest
+          command: ["dotnet", "Fcg.Games.Api.dll", "--migrate-only"]
+          envFrom:
+            - configMapRef:
+                name: fcg-games-config
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-games-db-secret
+                  key: ConnectionStrings__DefaultConnection
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-jwt-secret
+                  key: Jwt__Key
+            - name: RabbitMQ__Password
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-rabbitmq-secret
+                  key: RabbitMQ__Password
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "300m"
+              memory: "512Mi"
+
+---
+# Job — Payments Migration
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fcg-payments-migration
+  namespace: fcg
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migration
+          image: <SEU_ECR>/fcg-payments-service:latest
+          command: ["dotnet", "Fcg.Payments.Api.dll", "--migrate-only"]
+          envFrom:
+            - configMapRef:
+                name: fcg-payments-config
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-payments-db-secret
+                  key: ConnectionStrings__DefaultConnection
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-jwt-secret
+                  key: Jwt__Key
+            - name: RabbitMQ__Password
+              valueFrom:
+                secretKeyRef:
+                  name: fcg-rabbitmq-secret
+                  key: RabbitMQ__Password
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "300m"
+              memory: "512Mi"

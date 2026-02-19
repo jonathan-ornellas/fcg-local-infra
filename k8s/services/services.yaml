@@ -1,0 +1,75 @@
+# Service — Users
+apiVersion: v1
+kind: Service
+metadata:
+  name: fcg-users-service
+  namespace: fcg
+  labels:
+    app: fcg-users
+spec:
+  selector:
+    app: fcg-users
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+---
+# Service — Games
+apiVersion: v1
+kind: Service
+metadata:
+  name: fcg-games-service
+  namespace: fcg
+  labels:
+    app: fcg-games
+spec:
+  selector:
+    app: fcg-games
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+---
+# Service — Payments
+apiVersion: v1
+kind: Service
+metadata:
+  name: fcg-payments-service
+  namespace: fcg
+  labels:
+    app: fcg-payments
+spec:
+  selector:
+    app: fcg-payments
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+---
+# Service — Gateway (LoadBalancer expõe para fora via ALB no EKS)
+apiVersion: v1
+kind: Service
+metadata:
+  name: fcg-gateway-service
+  namespace: fcg
+  labels:
+    app: fcg-gateway
+  annotations:
+    # AWS Load Balancer Controller: cria um ALB automaticamente
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+spec:
+  selector:
+    app: fcg-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer

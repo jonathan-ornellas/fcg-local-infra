@@ -1,0 +1,45 @@
+# =============================================================================
+# Helm Values — Jaeger (jaegertracing/jaeger)
+#
+# Instalar:
+# helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+# helm install jaeger jaegertracing/jaeger \
+#   -n fcg \
+#   -f helm-values/jaeger-values.yaml
+# =============================================================================
+
+provisionDataStore:
+  cassandra: false
+  elasticsearch: false
+  kafka: false
+
+allInOne:
+  enabled: true
+  image:
+    tag: "1.54"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+  # Aceita OTLP gRPC (porta 4317) — exatamente o que os serviços enviam
+  extraEnv:
+    - name: COLLECTOR_OTLP_ENABLED
+      value: "true"
+
+storage:
+  type: memory  # Para produção real, trocar por elasticsearch
+
+agent:
+  enabled: false  # all-in-one já inclui o agent
+
+collector:
+  enabled: false  # all-in-one já inclui o collector
+
+query:
+  enabled: false  # all-in-one já inclui o query
+
+service:
+  type: ClusterIP
