@@ -37,6 +37,8 @@ spec:
       labels:
         app: users-db
     spec:
+      securityContext:      
+        fsGroup: 10001      
       containers:
         - name: sqlserver
           image: mcr.microsoft.com/mssql/server:2022-latest
@@ -116,6 +118,8 @@ spec:
       labels:
         app: games-db
     spec:
+      securityContext:      
+        fsGroup: 10001      
       containers:
         - name: sqlserver
           image: mcr.microsoft.com/mssql/server:2022-latest
@@ -195,6 +199,8 @@ spec:
       labels:
         app: payments-db
     spec:
+      securityContext:      
+        fsGroup: 10001      
       containers:
         - name: sqlserver
           image: mcr.microsoft.com/mssql/server:2022-latest
