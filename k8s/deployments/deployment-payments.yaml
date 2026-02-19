@@ -33,7 +33,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: fcg-payments
-          image: <SEU_ECR>/fcg-payments-service:latest
+          image: 911480091547.dkr.ecr.us-east-2.amazonaws.com/fcg-payments-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

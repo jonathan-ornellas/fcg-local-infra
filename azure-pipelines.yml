@@ -1,11 +1,15 @@
 trigger:
-- main
+- master
 
 pr:
-- main
+- master
 
 variables:
 - group: fcg-shared-vars
+- name: ECR_REPO
+  value: '$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/fcg-gateway'
+- name: IMAGE_TAG
+  value: '$(Build.BuildId)'
 
 stages:
 # =========================
@@ -29,70 +33,60 @@ stages:
       displayName: Build gateway
 
 # =========================
-# CD — Docker + Deploy
+# CD — Docker + ECR + EKS
 # =========================
 - stage: CD
-  displayName: CD - docker build/push and deploy
+  displayName: CD - build/push ECR and deploy to EKS
   dependsOn: CI
   condition: succeeded()
   jobs:
   - job: docker_push_and_deploy_gateway
+    displayName: Build, push gateway to ECR and deploy to EKS
     pool:
       name: self-hosted
     steps:
 
-    # 🔐 Docker Hub auth (clean + login)
-    - task: Docker@2
-      displayName: Docker logout
-      inputs:
-        command: logout
+    # --- Login no ECR ---
+    - script: |
+        aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+      displayName: Login to AWS ECR
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
 
-    - task: Docker@2
-      displayName: Docker login
-      inputs:
-        command: login
-        containerRegistry: dockerhub-connection
+    # --- Build + Push Docker image ---
+    - script: |
+        docker build -t "$(ECR_REPO):$(IMAGE_TAG)" -t "$(ECR_REPO):latest" -f gateway/Dockerfile gateway
+        docker push "$(ECR_REPO):$(IMAGE_TAG)"
+        docker push "$(ECR_REPO):latest"
+      displayName: Docker build & push to ECR
 
-    # 🐳 Build & Push (ÚNICO lugar onde isso acontece)
-    - task: Docker@2
-      displayName: Build and push gateway
-      inputs:
-        command: buildAndPush
-        containerRegistry: dockerhub-connection
-        repository: jonathanornellas/fcg-gateway
-        dockerfile: gateway/Dockerfile
-        buildContext: gateway
-        tags: |
-          latest
+    # --- Configure kubectl ---
+    - script: |
+        aws eks update-kubeconfig --name $(EKS_CLUSTER_NAME) --region $(AWS_REGION)
+      displayName: Configure kubectl for EKS
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
 
-    # 🔑 Download da chave EC2
-    - task: DownloadSecureFile@1
-      name: ec2key
-      inputs:
-        secureFile: fiap-kp.pem
+    # --- Deploy gateway to EKS ---
+    - script: |
+        kubectl set image deployment/fcg-gateway fcg-gateway=$(ECR_REPO):$(IMAGE_TAG) -n fcg
+        kubectl rollout status deployment/fcg-gateway -n fcg --timeout=120s
+      displayName: Deploy gateway to EKS
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
 
-    # 🚀 Deploy no EC2
-    - task: Bash@3
-      displayName: Deploy gateway to EC2
-      inputs:
-        targetType: inline
-        script: |
-          set -e
-
-          KEY_SRC=$(echo "$(ec2key.secureFilePath)" | sed 's#\\#/#g' | sed 's#^\([A-Za-z]\):#/mnt/\L\1#')
-          KEY_DST=~/.ssh/fiap-kp.pem
-
-          mkdir -p ~/.ssh
-          cp "$KEY_SRC" "$KEY_DST"
-          chmod 600 "$KEY_DST"
-
-          ssh -i "$KEY_DST" -o StrictHostKeyChecking=no ubuntu@$(EC2_Public_IP) '
-            docker pull jonathanornellas/fcg-gateway:latest &&
-            docker stop fcg-gateway || true &&
-            docker rm fcg-gateway || true &&
-            docker run -d \
-              --name fcg-gateway \
-              --restart unless-stopped \
-              --network fcg-net \
-              -p 8080:8080 \
-              jonathanornellas/fcg-gateway:latest'
+    # --- Apply K8s infrastructure manifests ---
+    - script: |
+        kubectl apply -f k8s/namespace/namespace.yaml
+        kubectl apply -f k8s/configmaps/
+        kubectl apply -f k8s/secrets/secrets.yaml
+        kubectl apply -f k8s/services/services.yaml
+        kubectl apply -f k8s/hpa/hpa.yaml
+        kubectl apply -f k8s/ingress/ingress.yaml
+      displayName: Apply K8s manifests
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)

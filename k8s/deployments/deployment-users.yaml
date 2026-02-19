@@ -35,7 +35,7 @@ spec:
       containers:
         - name: fcg-users
           # Substitua pelo seu ECR: <account-id>.dkr.ecr.<region>.amazonaws.com/fcg-users-service:latest
-          image: <SEU_ECR>/fcg-users-service:latest
+          image: 911480091547.dkr.ecr.us-east-2.amazonaws.com/fcg-users-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

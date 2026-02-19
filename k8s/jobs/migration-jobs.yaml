@@ -23,7 +23,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: migration
-          image: <SEU_ECR>/fcg-users-service:latest
+          image: 911480091547.dkr.ecr.us-east-2.amazonaws.com/fcg-users-service:latest
           # Sobrescreve o entrypoint para rodar apenas a migration
           command: ["dotnet", "Fcg.Users.Api.dll", "--migrate-only"]
           envFrom:
@@ -67,7 +67,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: migration
-          image: <SEU_ECR>/fcg-games-service:latest
+          image: 911480091547.dkr.ecr.us-east-2.amazonaws.com/fcg-games-service:latest
           command: ["dotnet", "Fcg.Games.Api.dll", "--migrate-only"]
           envFrom:
             - configMapRef:
@@ -110,7 +110,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: migration
-          image: <SEU_ECR>/fcg-payments-service:latest
+          image: 911480091547.dkr.ecr.us-east-2.amazonaws.com/fcg-payments-service:latest
           command: ["dotnet", "Fcg.Payments.Api.dll", "--migrate-only"]
           envFrom:
             - configMapRef:
