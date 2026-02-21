@@ -10,10 +10,9 @@
 
 grafana:
   enabled: true
-  adminPassword: "TROQUE_ANTES_DE_APLICAR"
+  adminPassword: "admin123"
   service:
     type: ClusterIP
-  # Dashboard de .NET pronto para usar
   dashboardProviders:
     dashboardproviders.yaml:
       apiVersion: 1
@@ -29,7 +28,6 @@ grafana:
   dashboards:
     default:
       dotnet-runtime:
-        # Dashboard ASP.NET Core do Grafana Community
         gnetId: 19924
         revision: 2
         datasource: Prometheus
@@ -41,7 +39,6 @@ grafana:
 prometheus:
   enabled: true
   prometheusSpec:
-    # Coleta métricas de todos os pods com annotation prometheus.io/scrape=true
     podMonitorSelectorNilUsesHelmValues: false
     serviceMonitorSelectorNilUsesHelmValues: false
     additionalScrapeConfigs:
@@ -75,7 +72,6 @@ prometheus:
 alertmanager:
   enabled: true
 
-# Não instala node-exporter no Fargate — desabilite se usar EKS Fargate
 nodeExporter:
   enabled: true
 

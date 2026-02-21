@@ -3,8 +3,6 @@ kind: Service
 metadata:
   name: fcg-users-api
   namespace: fcg
-  labels:
-    app: fcg-users
 spec:
   selector:
     app: fcg-users
@@ -20,8 +18,6 @@ kind: Service
 metadata:
   name: fcg-games-api
   namespace: fcg
-  labels:
-    app: fcg-games
 spec:
   selector:
     app: fcg-games
@@ -37,8 +33,6 @@ kind: Service
 metadata:
   name: fcg-payments-api
   namespace: fcg
-  labels:
-    app: fcg-payments
 spec:
   selector:
     app: fcg-payments
@@ -49,13 +43,12 @@ spec:
   type: ClusterIP
 
 ---
+# --- API Gateway (Entrada Principal) ---
 apiVersion: v1
 kind: Service
 metadata:
   name: fcg-gateway-service
   namespace: fcg 
-  labels:
-    app: fcg-gateway
 spec:
   type: NodePort 
   selector:
@@ -65,3 +58,57 @@ spec:
       port: 80
       targetPort: 8080
       nodePort: 30080
+
+---
+# --- Monitoramento e Mensageria 
+
+# Grafana - Acesso à UI de métricas
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-grafana-nodeport
+  namespace: fcg
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: grafana # Seletor padrão do Helm chart
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      nodePort: 30001
+
+---
+# RabbitMQ - Interface de Gerenciamento (Exchanges/Queues)
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-nodeport
+  namespace: fcg
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: rabbitmq # Seletor conforme seu kubectl get svc
+  ports:
+    - name: http-stats
+      port: 15672
+      targetPort: 15672
+      nodePort: 30002
+
+---
+# Jaeger - Interface de Tracing Distribuído
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-nodeport
+  namespace: fcg
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/instance: jaeger
+    app.kubernetes.io/name: jaeger
+  ports:
+    - name: query-http
+      port: 16686
+      targetPort: 16686
+      nodePort: 30003
