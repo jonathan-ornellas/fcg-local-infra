@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 trigger:
 - master
 
@@ -90,3 +91,97 @@ stages:
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+=======
+trigger:
+- master
+
+pr:
+- master
+
+variables:
+- group: fcg-shared-vars
+- name: ECR_REPO
+  value: '$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/fcg-gateway'
+- name: IMAGE_TAG
+  value: '$(Build.BuildId)'
+
+stages:
+# =========================
+# CI — Build
+# =========================
+- stage: CI
+  displayName: CI - build gateway
+  jobs:
+  - job: build_gateway
+    pool:
+      name: self-hosted
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: sdk
+        version: 8.x
+
+    - script: |
+        dotnet restore gateway/Fcg.Gateway/Fcg.Gateway.csproj
+        dotnet build   gateway/Fcg.Gateway/Fcg.Gateway.csproj -c Release --no-restore
+      displayName: Build gateway
+
+# =========================
+# CD — Docker + ECR + EKS
+# =========================
+- stage: CD
+  displayName: CD - build/push ECR and deploy to EKS
+  dependsOn: CI
+  condition: succeeded()
+  jobs:
+  - job: docker_push_and_deploy_gateway
+    displayName: Build, push gateway to ECR and deploy to EKS
+    pool:
+      name: self-hosted
+    steps:
+
+    # --- Login no ECR ---
+    - script: |
+        aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+      displayName: Login to AWS ECR
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+
+    # --- Build + Push Docker image ---
+    - script: |
+        docker build -t "$(ECR_REPO):$(IMAGE_TAG)" -t "$(ECR_REPO):latest" -f gateway/Dockerfile gateway
+        docker push "$(ECR_REPO):$(IMAGE_TAG)"
+        docker push "$(ECR_REPO):latest"
+      displayName: Docker build & push to ECR
+
+    # --- Configure kubectl ---
+    - script: |
+        aws eks update-kubeconfig --name $(EKS_CLUSTER_NAME) --region $(AWS_REGION)
+      displayName: Configure kubectl for EKS
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+
+    # --- Deploy gateway to EKS ---
+    - script: |
+        kubectl set image deployment/fcg-gateway fcg-gateway=$(ECR_REPO):$(IMAGE_TAG) -n fcg
+        kubectl rollout status deployment/fcg-gateway -n fcg --timeout=120s
+      displayName: Deploy gateway to EKS
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+
+    # --- Apply K8s infrastructure manifests ---
+    - script: |
+        kubectl apply -f k8s/namespace/namespace.yaml
+        kubectl apply -f k8s/configmaps/
+        kubectl apply -f k8s/secrets/secrets.yaml
+        kubectl apply -f k8s/services/services.yaml
+        kubectl apply -f k8s/hpa/hpa.yaml
+        kubectl apply -f k8s/ingress/ingress.yaml
+      displayName: Apply K8s manifests
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+>>>>>>> 3265980b4c345c92840b6a019b1736a8df548c3a
